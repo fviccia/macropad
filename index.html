@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Macropad V2 Configurator</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #171b24;
+      --panel-2: #1f2430;
+      --border: #2c3344;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --key-bg: #232938;
+      --key-border: #384152;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand h1 {
+      font-size: 18px;
+      margin: 0;
+      font-weight: 600;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #271f24;
+      color: #f87171;
+      border: 1px solid #5c2828;
+    }
+    .status-pill.connected {
+      background: #132a20;
+      color: #4ade80;
+      border-color: #1f5c3a;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button, .btn {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { border-color: #4b5563; background: #262c3a; }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    button.primary:hover { background: var(--accent-hover); }
+    button.success {
+      background: #16a34a;
+      border-color: #16a34a;
+      color: #fff;
+    }
+    button.success:hover { background: #15803d; }
+    button.danger {
+      color: #fca5a5;
+      border-color: #5c2828;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 24px;
+      padding: 24px;
+      max-width: 1320px;
+      width: 100%;
+      margin: 0 auto;
+      flex: 1;
+    }
+    @media (max-width: 960px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    /* Layout Tabs */
+    .layout-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .layout-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 8px;
+      border-radius: 10px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      gap: 4px;
+    }
+    .layout-tab.active {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.14);
+    }
+    .layout-tab .tab-num {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .layout-tab .tab-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    /* Physical Macropad Case Replica */
+    .macropad-case {
+      background: #12151d;
+      border: 2px solid #2d3548;
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.5), 0 12px 24px rgba(0,0,0,0.35);
+      max-width: 360px;
+      margin: 0 auto;
+    }
+    .pad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .keycap {
+      aspect-ratio: 1 / 1;
+      background: var(--key-bg);
+      border: 2px solid var(--key-border);
+      border-bottom-width: 5px;
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.08s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      position: relative;
+      text-align: center;
+    }
+    .keycap:hover {
+      border-color: #64748b;
+    }
+    .keycap.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+      background: #243048;
+    }
+    .keycap.live-press {
+      transform: translateY(2px);
+      border-bottom-width: 2px;
+      border-color: var(--green) !important;
+      box-shadow: 0 0 14px rgba(34, 197, 94, 0.45) !important;
+    }
+    .keycap.fixed-key {
+      background: #1b202c;
+      border-style: dashed;
+    }
+    .keycap .key-id {
+      font-size: 10px;
+      color: var(--muted);
+      align-self: flex-start;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .keycap .key-label {
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .keycap .key-sub {
+      font-size: 10px;
+      color: #93c5fd;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Rotary Encoder Widget */
+    .encoder-cap {
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      background: radial-gradient(circle at 32% 30%, #374151, #181c24);
+      border: 3px solid #4b5563;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 8px;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .encoder-cap:hover { border-color: #9ca3af; }
+    .encoder-cap.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+    .encoder-cap.live-press {
+      border-color: var(--green);
+      box-shadow: 0 0 16px rgba(34, 197, 94, 0.5);
+    }
+    .encoder-cap .enc-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #f3f4f6;
+    }
+    .encoder-cap .enc-sub {
+      font-size: 9px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+
+    /* 4 Bottom State LEDs */
+    .leds-row {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 14px;
+      border-top: 1px solid #222836;
+    }
+    .led-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .led-bulb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #2a1c1c;
+      border: 2px solid #472828;
+      transition: all 0.2s ease;
+    }
+    .led-bulb.on {
+      background: #ef4444;
+      border-color: #fca5a5;
+      box-shadow: 0 0 12px #ef4444, 0 0 4px #ffffff;
+    }
+    .led-label {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    /* Editor Form */
+    .form-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 640px) {
+      .field-row { grid-template-columns: 1fr; }
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #cbd5e1;
+    }
+    input[type="text"], input[type="number"], select, textarea {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+    .mods-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .mod-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 8px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      user-select: none;
+    }
+    .mod-pill input { margin: 0; }
+    .mod-pill.checked {
+      background: rgba(59, 130, 246, 0.18);
+      border-color: var(--accent);
+      color: #93c5fd;
+    }
+
+    .preset-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .preset-chip {
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: #1e2534;
+      border: 1px solid #303a4f;
+      cursor: pointer;
+      color: #cbd5e1;
+    }
+    .preset-chip:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .memory-bar-wrap {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+    .memory-bar {
+      height: 6px;
+      background: #11141c;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .memory-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      font-size: 13px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 100;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .subtle-hint {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    hr.sep {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>🎛️ Programmable Macropad V2</h1>
+      <span id="connStatus" class="status-pill">
+        <span class="status-dot"></span>
+        <span id="connText">Desconectado</span>
+      </span>
+    </div>
+    <div class="toolbar">
+      <button id="btnConnect" class="primary" onclick="toggleConnection()">🔌 Conectar Macropad</button>
+      <button id="btnSaveEeprom" class="success" onclick="saveToMacropad()" disabled>💾 Guardar en Macropad</button>
+      <button id="btnReadEeprom" onclick="readFromMacropad()" disabled>🔄 Leer del Macropad</button>
+      <button onclick="exportJson()">⬇️ Exportar JSON</button>
+      <button onclick="document.getElementById('fileImport').click()">⬆️ Importar JSON</button>
+      <input id="fileImport" type="file" accept=".json" style="display:none" onchange="importJson(event)" />
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Visual Pad & Layout Selector -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Vista Física del Macropad</h2>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);">
+          <input type="checkbox" id="chkFollowHw" checked />
+          Seguir pulsación física
+        </label>
+      </div>
+
+      <div class="layout-tabs" id="layoutTabs"></div>
+
+      <div class="macropad-case">
+        <div class="pad-grid" id="padGrid"></div>
+        <div class="leds-row" id="ledsRow"></div>
+      </div>
+
+      <div style="margin-top: 18px;" class="memory-bar-wrap">
+        <div style="display:flex;justify-content:space-between;">
+          <span>Memoria EEPROM de textos en chip</span>
+          <span id="memUsageText">0 / 848 bytes</span>
+        </div>
+        <div class="memory-bar">
+          <div class="memory-fill" id="memFill"></div>
+        </div>
+      </div>
+
+      <p class="subtle-hint" style="margin-top:14px;margin-bottom:0;">
+        Tocá cualquier tecla o el encoder en el dibujo (o presioná físicamente el botón en el Macropad conectado) para editar qué hace.
+      </p>
+    </div>
+
+    <!-- Right Column: Action Editor -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title" id="editorTitle">Configurar Tecla</h2>
+        <div style="display:flex;gap:8px;">
+          <button id="btnTestAction" onclick="copyButtonConfig()">📋 Copiar tecla</button>
+          <button id="btnPasteAction" onclick="pasteButtonConfig()" disabled>📥 Pegar</button>
+        </div>
+      </div>
+
+      <!-- Button Editor Panel -->
+      <div id="buttonEditorPanel" class="form-section">
+        <div class="field-row">
+          <div class="field">
+            <label>Nombre del Layout actual (<span id="lblLayoutNum">1</span>)</label>
+            <input type="text" id="inpLayoutName" placeholder="Ej: General / Mac" oninput="onLayoutNameChange()" />
+          </div>
+          <div class="field">
+            <label>Etiqueta visible de esta tecla</label>
+            <input type="text" id="inpBtnLabel" placeholder="Auto (según la acción)" oninput="onBtnLabelChange()" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Presets rápidos para macOS (un click para rellenar)</label>
+          <div class="preset-grid" id="presetGrid"></div>
+        </div>
+
+        <hr class="sep" />
+
+        <div class="field">
+          <label>Tipo de Acción</label>
+          <select id="selActionType" onchange="onActionTypeChange()">
+            <option value="0">0 — Sin acción (Desactivada)</option>
+            <option value="1">1 — Tecla o Atajo de teclado (Cmd / Opt / Shift / Ctrl + Tecla)</option>
+            <option value="3">3 — Escribir Texto o Comando (guardado en EEPROM)</option>
+            <option value="2">2 — Control Multimedia / Sistema (Volumen, Play/Pause, Brillo...)</option>
+            <option value="4">4 — Secuencia de 2 Atajos seguidos (ej: Cmd+K y luego Cmd+S)</option>
+            <option value="5">5 — Cambiar a otro Layout</option>
+          </select>
+        </div>
+
+        <!-- Dynamic Sub-panels -->
+        <!-- TYPE 1: KEY / SHORTCUT -->
+        <div id="panelTypeKey" class="form-section" style="display:none;">
+          <div class="field">
+            <label>Modificadores</label>
+            <div class="mods-group" id="keyModsGroup">
+              <label class="mod-pill"><input type="checkbox" data-mod="8" onchange="onKeyFormChange()" /> ⌘ Cmd</label>
+              <label class="mod-pill"><input type="checkbox" data-mod="4" onchange="onKeyFormChange()" /> ⌥ Option</label>
+              <label class="mod-pill"><input type="checkbox" data-mod="2" onchange="onKeyFormChange()" /> ⇧ Shift</label>
+              <label class="mod-pill"><input type="checkbox" data-mod="1" onchange="onKeyFormChange()" /> ⌃ Ctrl</label>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Tecla Principal</label>
+              <div style="display:flex;gap:8px;">
+                <select id="selKey1" style="flex:1;" onchange="onKeyFormChange()"></select>
+                <button type="button" id="btnCaptureKey" onclick="startKeyCapture('selKey1')">⌨️ Capturar</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>2ª Tecla Simultánea (Opcional)</label>
+              <select id="selKey2" onchange="onKeyFormChange()"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- TYPE 3: TEXT MACRO -->
+        <div id="panelTypeText" class="form-section" style="display:none;">
+          <div class="field">
+            <label>Texto o comando a escribir</label>
+            <textarea id="inpMacroText" rows="3" placeholder="Ej: ssh homelab-01 (soporta ñ, Ñ, áéíóú, ¿¡)" oninput="onTextFormChange()"></textarea>
+            <span class="subtle-hint">Soporta caracteres en español (ñ, Ñ, á, é, í, ó, ú, ü, ¿, ¡) para teclado macOS ABC.</span>
+          </div>
+          <div class="mods-group">
+            <label class="mod-pill"><input type="checkbox" id="chkTextEnter" onchange="onTextFormChange()" /> Presionar Enter (↵) al final</label>
+            <label class="mod-pill"><input type="checkbox" id="chkTextTab" onchange="onTextFormChange()" /> Presionar Tab (⇥) al final</label>
+          </div>
+        </div>
+
+        <!-- TYPE 2: MEDIA -->
+        <div id="panelTypeMedia" class="form-section" style="display:none;">
+          <div class="field">
+            <label>Acción Multimedia / Sistema</label>
+            <select id="selMediaCode" onchange="onMediaFormChange()"></select>
+          </div>
+        </div>
+
+        <!-- TYPE 4: 2-STEP SEQUENCE -->
+        <div id="panelTypeSeq" class="form-section" style="display:none;">
+          <div class="field">
+            <label>Paso 1 — Modificadores + Tecla</label>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <div class="mods-group" id="seqMods1">
+                <label class="mod-pill"><input type="checkbox" data-mod="8" onchange="onSeqFormChange()" /> ⌘ Cmd</label>
+                <label class="mod-pill"><input type="checkbox" data-mod="4" onchange="onSeqFormChange()" /> ⌥ Opt</label>
+                <label class="mod-pill"><input type="checkbox" data-mod="2" onchange="onSeqFormChange()" /> ⇧ Shift</label>
+                <label class="mod-pill"><input type="checkbox" data-mod="1" onchange="onSeqFormChange()" /> ⌃ Ctrl</label>
+              </div>
+              <select id="selSeqKey1" style="flex:1;min-width:160px;" onchange="onSeqFormChange()"></select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Paso 2 (45 ms después) — Modificadores + Tecla</label>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <div class="mods-group" id="seqMods2">
+                <label class="mod-pill"><input type="checkbox" data-mod="8" onchange="onSeqFormChange()" /> ⌘ Cmd</label>
+                <label class="mod-pill"><input type="checkbox" data-mod="4" onchange="onSeqFormChange()" /> ⌥ Opt</label>
+                <label class="mod-pill"><input type="checkbox" data-mod="2" onchange="onSeqFormChange()" /> ⇧ Shift</label>
+                <label class="mod-pill"><input type="checkbox" data-mod="1" onchange="onSeqFormChange()" /> ⌃ Ctrl</label>
+              </div>
+              <select id="selSeqKey2" style="flex:1;min-width:160px;" onchange="onSeqFormChange()"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- TYPE 5: SWITCH LAYOUT -->
+        <div id="panelTypeLayout" class="form-section" style="display:none;">
+          <div class="field">
+            <label>Destino de Layout</label>
+            <select id="selTargetLayout" onchange="onLayoutTargetChange()">
+              <option value="255">Siguiente Layout (1 → 2 → 3 → 4)</option>
+              <option value="254">Layout Anterior (4 → 3 → 2 → 1)</option>
+              <option value="0">Ir directo al Layout 1</option>
+              <option value="1">Ir directo al Layout 2</option>
+              <option value="2">Ir directo al Layout 3</option>
+              <option value="3">Ir directo al Layout 4</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Encoder Editor Panel -->
+      <div id="encoderEditorPanel" class="form-section" style="display:none;">
+        <div class="field-row">
+          <div class="field">
+            <label>Giro a la derecha (Sentido horario ↻)</label>
+            <select id="selEncCw" onchange="onEncoderFormChange()"></select>
+          </div>
+          <div class="field">
+            <label>Giro a la izquierda (Sentido antihorario ↺)</label>
+            <select id="selEncCcw" onchange="onEncoderFormChange()"></select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Click corto del Encoder</label>
+            <select id="selEncClick" onchange="onEncoderFormChange()"></select>
+          </div>
+          <div class="field">
+            <label>Click largo (&gt;0.5s) del Encoder</label>
+            <select id="selEncLongClick" onchange="onEncoderFormChange()"></select>
+            <span class="subtle-hint">Dejalo en "Desactivado" para que el click corto actúe instantáneamente al bajar el botón.</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Pulsos por "click" físico (sensibilidad)</label>
+            <select id="selEncSteps" onchange="onEncoderFormChange()">
+              <option value="4">4 pulsos = 1 paso (Estándar para tu encoder)</option>
+              <option value="2">2 pulsos = 1 paso (Doble sensibilidad)</option>
+              <option value="1">1 pulso = 1 paso (Máxima sensibilidad)</option>
+              <option value="8">8 pulsos = 1 paso (Mitad de sensibilidad)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Layout inicial al enchufar el Macropad</label>
+            <select id="selDefaultLayout" onchange="onEncoderFormChange()">
+              <option value="0">Layout 1</option>
+              <option value="1">Layout 2</option>
+              <option value="2">Layout 3</option>
+              <option value="3">Layout 4</option>
+            </select>
+          </div>
+        </div>
+        <div class="mods-group">
+          <label class="mod-pill">
+            <input type="checkbox" id="chkEncInvert" onchange="onEncoderFormChange()" />
+            Invertir dirección de giro (Activado = tu configuración actual)
+          </label>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // =========================================================================
+    // Keycodes & Media Catalog (USB HID Usage IDs used by HID-Project)
+    // =========================================================================
+    const HID_KEYS = [
+      { code: 0,   label: "— Ninguna —", short: "" },
+      // Letters A-Z (4..29)
+      ...Array.from({ length: 26 }, (_, i) => {
+        const ch = String.fromCharCode(65 + i);
+        return { code: 4 + i, label: `Letra ${ch}`, short: ch, jsCode: `Key${ch}` };
+      }),
+      // Numbers 1-9, 0 (30..39)
+      { code: 30, label: "Número 1 (!)", short: "1", jsCode: "Digit1" },
+      { code: 31, label: "Número 2 (@)", short: "2", jsCode: "Digit2" },
+      { code: 32, label: "Número 3 (#)", short: "3", jsCode: "Digit3" },
+      { code: 33, label: "Número 4 ($)", short: "4", jsCode: "Digit4" },
+      { code: 34, label: "Número 5 (%)", short: "5", jsCode: "Digit5" },
+      { code: 35, label: "Número 6 (^)", short: "6", jsCode: "Digit6" },
+      { code: 36, label: "Número 7 (&)", short: "7", jsCode: "Digit7" },
+      { code: 37, label: "Número 8 (*)", short: "8", jsCode: "Digit8" },
+      { code: 38, label: "Número 9 (( )", short: "9", jsCode: "Digit9" },
+      { code: 39, label: "Número 0 ())", short: "0", jsCode: "Digit0" },
+      // Control & Navigation
+      { code: 40, label: "Enter / Return (↵)", short: "Enter", jsCode: "Enter" },
+      { code: 41, label: "Escape (⎋)", short: "Esc", jsCode: "Escape" },
+      { code: 42, label: "Backspace / Borrar (⌫)", short: "⌫", jsCode: "Backspace" },
+      { code: 43, label: "Tab (⇥)", short: "Tab", jsCode: "Tab" },
+      { code: 44, label: "Espacio (␣)", short: "Space", jsCode: "Space" },
+      { code: 76, label: "Suprimir / Forward Delete (⌦)", short: "Del", jsCode: "Delete" },
+      { code: 82, label: "Flecha Arriba (↑)", short: "↑", jsCode: "ArrowUp" },
+      { code: 81, label: "Flecha Abajo (↓)", short: "↓", jsCode: "ArrowDown" },
+      { code: 80, label: "Flecha Izquierda (←)", short: "←", jsCode: "ArrowLeft" },
+      { code: 79, label: "Flecha Derecha (→)", short: "→", jsCode: "ArrowRight" },
+      { code: 74, label: "Home / Inicio", short: "Home", jsCode: "Home" },
+      { code: 77, label: "End / Fin", short: "End", jsCode: "End" },
+      { code: 75, label: "Page Up (RePág)", short: "PgUp", jsCode: "PageUp" },
+      { code: 78, label: "Page Down (AvPág)", short: "PgDn", jsCode: "PageDown" },
+      // Punctuation
+      { code: 45, label: "Guion - (_)", short: "-", jsCode: "Minus" },
+      { code: 46, label: "Igual = (+)", short: "=", jsCode: "Equal" },
+      { code: 47, label: "Corchete [ ({)", short: "[", jsCode: "BracketLeft" },
+      { code: 48, label: "Corchete ] (})", short: "]", jsCode: "BracketRight" },
+      { code: 49, label: "Barra invertida \\ (|)", short: "\\", jsCode: "Backslash" },
+      { code: 51, label: "Punto y coma ; (:)", short: ";", jsCode: "Semicolon" },
+      { code: 52, label: "Comilla ' (\")", short: "'", jsCode: "Quote" },
+      { code: 53, label: "Grave ` (~)", short: "`", jsCode: "Backquote" },
+      { code: 54, label: "Coma , (<)", short: ",", jsCode: "Comma" },
+      { code: 55, label: "Punto . (>)", short: ".", jsCode: "Period" },
+      { code: 56, label: "Barra / (?)", short: "/", jsCode: "Slash" },
+      // Function keys F1-F12 (58..69)
+      ...Array.from({ length: 12 }, (_, i) => ({
+        code: 58 + i,
+        label: `F${i + 1}`,
+        short: `F${i + 1}`,
+        jsCode: `F${i + 1}`
+      })),
+      // Function keys F13-F24 (104..115) — great for macOS Shortcuts/Raycast!
+      ...Array.from({ length: 12 }, (_, i) => ({
+        code: 104 + i,
+        label: `F${i + 13} (Ideal para Atajos macOS / Raycast)`,
+        short: `F${i + 13}`,
+        jsCode: `F${i + 13}`
+      }))
+    ];
+
+    const MEDIA_ACTIONS = [
+      { code: 0,      label: "— Desactivado —", short: "Off" },
+      { code: 0x00CD, label: "⏯️ Play / Pause", short: "Play/Pause" },
+      { code: 0x00B5, label: "⏭️ Siguiente Canción (Next)", short: "Next" },
+      { code: 0x00B6, label: "⏮️ Canción Anterior (Prev)", short: "Prev" },
+      { code: 0x00B7, label: "⏹️ Stop", short: "Stop" },
+      { code: 0x00E2, label: "🔇 Mute / Unmute Audio", short: "Mute" },
+      { code: 0x00E9, label: "🔊 Subir Volumen (1 bloque)", short: "Vol +" },
+      { code: 0x00EA, label: "🔉 Bajar Volumen (1 bloque)", short: "Vol -" },
+      { code: 0xFF01, label: "🔊 Subir Volumen Fino macOS (¼ bloque: ⌥+⇧+Vol+)", short: "Vol+ Fino" },
+      { code: 0xFF02, label: "🔉 Bajar Volumen Fino macOS (¼ bloque: ⌥+⇧+Vol-)", short: "Vol- Fino" },
+      { code: 0x006F, label: "☀️ Subir Brillo de Pantalla", short: "Brillo +" },
+      { code: 0x0070, label: "🔅 Bajar Brillo de Pantalla", short: "Brillo -" },
+      { code: 0x019E, label: "🌙 Protector de Pantalla / Lock", short: "Screensaver" }
+    ];
+
+    const MACOS_PRESETS = [
+      { name: "📸 Captura (Área)",      label: "Captura Área",  type: 1, mods: 8 | 2,     arg1: 33, arg2: 0 }, // Cmd+Shift+4
+      { name: "📋 Captura (Clipboard)", label: "Captura Clip",  type: 1, mods: 8 | 4 | 2, arg1: 33, arg2: 0 }, // Cmd+Ctrl+Shift+4
+      { name: "🎥 Panel Captura",       label: "Panel Captura", type: 1, mods: 8 | 2,     arg1: 34, arg2: 0 }, // Cmd+Shift+5
+      { name: "🔒 Bloquear Mac",        label: "Bloquear Mac",  type: 1, mods: 8 | 1,     arg1: 20, arg2: 0 }, // Cmd+Ctrl+Q
+      { name: "🔍 Spotlight",           label: "Spotlight",     type: 1, mods: 8,         arg1: 44, arg2: 0 }, // Cmd+Space
+      { name: "🖥️ Mission Control",     label: "Mission Ctrl",  type: 1, mods: 1,         arg1: 82, arg2: 0 }, // Ctrl+Up
+      { name: "📋 Copiar (⌘C)",         label: "Copiar",        type: 1, mods: 8,         arg1: 6,  arg2: 0 },
+      { name: "📥 Pegar (⌘V)",          label: "Pegar",         type: 1, mods: 8,         arg1: 25, arg2: 0 },
+      { name: "↩️ Deshacer (⌘Z)",       label: "Deshacer",      type: 1, mods: 8,         arg1: 29, arg2: 0 },
+      { name: "💾 Guardar (⌘S)",        label: "Guardar",       type: 1, mods: 8,         arg1: 22, arg2: 0 },
+      { name: "🎙️ Mute Meet (⌘D)",      label: "Mute Meet",     type: 1, mods: 8,         arg1: 7,  arg2: 0 },
+      { name: "🎙️ Mute Zoom (⌘⇧A)",     label: "Mute Zoom",     type: 1, mods: 8 | 2,     arg1: 4,  arg2: 0 },
+      { name: "⏯️ Play / Pause",        label: "Play/Pause",    type: 2, mods: 0,         arg1: 0xCD, arg2: 0 },
+      { name: "⏭️ Next Track",          label: "Next Track",    type: 2, mods: 0,         arg1: 0xB5, arg2: 0 },
+      { name: "⚡ Tecla F13",           label: "F13",           type: 1, mods: 0,         arg1: 104, arg2: 0 },
+      { name: "⚡ Tecla F14",           label: "F14",           type: 1, mods: 0,         arg1: 105, arg2: 0 },
+      { name: "⚡ Tecla F15",           label: "F15",           type: 1, mods: 0,         arg1: 106, arg2: 0 },
+      { name: "🚫 Vaciar tecla",        label: "",              type: 0, mods: 0,         arg1: 0,   arg2: 0 }
+    ];
+
+    // =========================================================================
+    // Application State
+    // =========================================================================
+    const EEPROM_TXT_SIZE = 848;
+    let activeLayout = 0;
+    let selectedTarget = { kind: "btn", btnIdx: 6 }; // Default selected: top-left of 3x3 ('7')
+    let clipboardBtn = null;
+
+    let state = createDefaultState();
+
+    // Web Serial state
+    let port = null;
+    let reader = null;
+    let writer = null;
+    let readableClosed = null;
+    let writableClosed = null;
+    let serialBuffer = "";
+    let dumpLines = null;
+    let dumpResolve = null;
+
+    function createDefaultState() {
+      const layouts = Array.from({ length: 4 }, (_, l) => ({
+        name: `Layout ${l + 1}`,
+        buttons: Array.from({ length: 10 }, (_, b) => ({
+          label: "",
+          type: 0,
+          mods: 0,
+          arg1: 0,
+          arg2: 0,
+          text: ""
+        }))
+      }));
+
+      // Match firmware defaults
+      for (let b = 0; b < 9; b++) {
+        layouts[0].buttons[b] = { label: "", type: 1, mods: 0, arg1: 30 + b, arg2: 0, text: "" };
+        layouts[3].buttons[b] = { label: "", type: 1, mods: 0, arg1: 30 + b, arg2: 0, text: "" };
+      }
+      layouts[1].buttons[5] = { label: "", type: 1, mods: 0, arg1: 40, arg2: 0, text: "" }; // Enter
+      layouts[1].buttons[6] = { label: "", type: 1, mods: 0, arg1: 41, arg2: 0, text: "" }; // Esc
+
+      const l3Keys = [36, 37, 38, 33, 34, 35, 30, 31, 32];
+      for (let b = 0; b < 9; b++) {
+        layouts[2].buttons[b] = { label: "", type: 1, mods: 0, arg1: l3Keys[b], arg2: 0, text: "" };
+      }
+
+      return {
+        encoder: {
+          stepsPerClick: 4,
+          invert: 1,
+          cwCode: 0x00E9,
+          ccwCode: 0x00EA,
+          clickCode: 0x00E2,
+          longClickCode: 0,
+          defaultLayout: 0
+        },
+        layouts
+      };
+    }
+
+    // Load saved labels/state from localStorage
+    function loadFromLocalStorage() {
+      try {
+        const raw = localStorage.getItem("macropad_v2_state");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.layouts && parsed.layouts.length === 4 && parsed.encoder) {
+            state = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not load local state:", e);
+      }
+    }
+
+    function saveToLocalStorage() {
+      try {
+        localStorage.setItem("macropad_v2_state", JSON.stringify(state));
+      } catch (e) {}
+    }
+
+    // =========================================================================
+    // UI Helpers & Rendering
+    // =========================================================================
+    function formatMods(mods) {
+      let s = "";
+      if (mods & 1) s += "⌃";
+      if (mods & 4) s += "⌥";
+      if (mods & 2) s += "⇧";
+      if (mods & 8) s += "⌘";
+      return s;
+    }
+
+    function getKeyShort(code) {
+      const k = HID_KEYS.find(x => x.code === code);
+      return k ? k.short : (code ? `K${code}` : "");
+    }
+
+    function getMediaShort(code) {
+      const m = MEDIA_ACTIONS.find(x => x.code === code);
+      return m ? m.short : `M${code}`;
+    }
+
+    function describeButton(btn) {
+      switch (Number(btn.type)) {
+        case 0:
+          return { title: btn.label || "Vacío", sub: "—" };
+        case 1: {
+          const m = formatMods(btn.mods);
+          const k1 = getKeyShort(btn.arg1);
+          const k2 = btn.arg2 ? "+" + getKeyShort(btn.arg2) : "";
+          const combo = `${m}${k1}${k2}` || "Tecla";
+          return { title: btn.label || combo, sub: combo };
+        }
+        case 2: {
+          const code = (btn.arg1 & 0xFF) | ((btn.arg2 & 0xFF) << 8);
+          const mShort = getMediaShort(code);
+          return { title: btn.label || mShort, sub: "Media" };
+        }
+        case 3: {
+          const t = btn.text || "";
+          const suffix = (btn.mods & 1) ? " ↵" : ((btn.mods & 2) ? " ⇥" : "");
+          const preview = t.length > 10 ? t.slice(0, 10) + "…" : (t || "Texto");
+          return { title: btn.label || preview, sub: `Txt${suffix}` };
+        }
+        case 4: {
+          const s1 = `${formatMods(btn.mods & 0x0F)}${getKeyShort(btn.arg1)}`;
+          const s2 = `${formatMods((btn.mods >> 4) & 0x0F)}${getKeyShort(btn.arg2)}`;
+          const seq = `${s1} → ${s2}`;
+          return { title: btn.label || seq, sub: seq };
+        }
+        case 5: {
+          let t = "Layout";
+          if (btn.arg1 === 255) t = "Layout +1";
+          else if (btn.arg1 === 254) t = "Layout -1";
+          else t = `Ir a L${btn.arg1 + 1}`;
+          return { title: btn.label || t, sub: t };
+        }
+        default:
+          return { title: "?", sub: "" };
+      }
+    }
+
+    function renderAll() {
+      renderLayoutTabs();
+      renderPadGrid();
+      renderLedsRow();
+      renderEditorPanel();
+      updateMemoryBar();
+      saveToLocalStorage();
+    }
+
+    function renderLayoutTabs() {
+      const container = document.getElementById("layoutTabs");
+      container.innerHTML = "";
+      state.layouts.forEach((lay, idx) => {
+        const div = document.createElement("div");
+        div.className = "layout-tab" + (idx === activeLayout ? " active" : "");
+        div.onclick = () => selectLayout(idx, true);
+        div.innerHTML = `
+          <span class="tab-num">LED ${idx + 1}</span>
+          <span class="tab-name">${escapeHtml(lay.name || `Layout ${idx + 1}`)}</span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Physical order on the 4x3 grid:
+    // Row 1: Encoder | '*' (cycle layout) | '-' (btnIdx 9)
+    // Row 2: '7' (6) | '8' (7)            | '9' (8)
+    // Row 3: '4' (3) | '5' (4)            | '6' (5)
+    // Row 4: '1' (0) | '2' (1)            | '3' (2)
+    function renderPadGrid() {
+      const grid = document.getElementById("padGrid");
+      grid.innerHTML = "";
+
+      // 1. Rotary Encoder (Top-Left)
+      const encDiv = document.createElement("div");
+      encDiv.id = "pad-enc";
+      encDiv.className = "encoder-cap" + (selectedTarget.kind === "enc" ? " selected" : "");
+      encDiv.onclick = () => {
+        selectedTarget = { kind: "enc" };
+        renderAll();
+      };
+      const clickShort = getMediaShort(state.encoder.clickCode);
+      encDiv.innerHTML = `
+        <div class="enc-title">🎛️ Encoder</div>
+        <div class="enc-sub">${escapeHtml(clickShort)}</div>
+      `;
+      grid.appendChild(encDiv);
+
+      // 2. '*' Cycle Layout Key (Top-Center)
+      const starDiv = document.createElement("div");
+      starDiv.id = "pad-star";
+      starDiv.className = "keycap fixed-key";
+      starDiv.title = "Cambia al siguiente Layout (1 → 2 → 3 → 4)";
+      starDiv.onclick = () => {
+        selectLayout((activeLayout + 1) % 4, true);
+      };
+      starDiv.innerHTML = `
+        <span class="key-id">*</span>
+        <span class="key-label">Cambiar Layout</span>
+        <span class="key-sub">L1 → L4</span>
+      `;
+      grid.appendChild(starDiv);
+
+      // 3. '-' Extra Button (Top-Right, btnIdx 9)
+      grid.appendChild(createButtonCapElement(9, "-"));
+
+      // Rows 2..4
+      const order = [
+        [6, "7"], [7, "8"], [8, "9"],
+        [3, "4"], [4, "5"], [5, "6"],
+        [0, "1"], [1, "2"], [2, "3"]
+      ];
+      for (const [btnIdx, hwKey] of order) {
+        grid.appendChild(createButtonCapElement(btnIdx, hwKey));
+      }
+    }
+
+    function createButtonCapElement(btnIdx, hwKey) {
+      const btn = state.layouts[activeLayout].buttons[btnIdx];
+      const desc = describeButton(btn);
+      const isSel = selectedTarget.kind === "btn" && selectedTarget.btnIdx === btnIdx;
+      const div = document.createElement("div");
+      div.id = `pad-btn-${btnIdx}`;
+      div.className = "keycap" + (isSel ? " selected" : "");
+      div.onclick = () => {
+        selectedTarget = { kind: "btn", btnIdx };
+        renderAll();
+      };
+      div.innerHTML = `
+        <span class="key-id">[${hwKey}]</span>
+        <span class="key-label">${escapeHtml(desc.title)}</span>
+        <span class="key-sub">${escapeHtml(desc.sub)}</span>
+      `;
+      return div;
+    }
+
+    function renderLedsRow() {
+      const row = document.getElementById("ledsRow");
+      row.innerHTML = "";
+      for (let i = 0; i < 4; i++) {
+        const item = document.createElement("div");
+        item.className = "led-item";
+        item.onclick = () => selectLayout(i, true);
+        item.innerHTML = `
+          <div class="led-bulb ${i === activeLayout ? "on" : ""}"></div>
+          <span class="led-label">S${i + 1}</span>
+        `;
+        row.appendChild(item);
+      }
+    }
+
+    function renderEditorPanel() {
+      const btnPanel = document.getElementById("buttonEditorPanel");
+      const encPanel = document.getElementById("encoderEditorPanel");
+      const copyBtn = document.getElementById("btnTestAction");
+      const pasteBtn = document.getElementById("btnPasteAction");
+
+      if (selectedTarget.kind === "enc") {
+        document.getElementById("editorTitle").textContent = "🎛️ Configurar Encoder Rotativo (Global)";
+        btnPanel.style.display = "none";
+        encPanel.style.display = "flex";
+        copyBtn.style.display = "none";
+        pasteBtn.style.display = "none";
+
+        document.getElementById("selEncCw").value = String(state.encoder.cwCode);
+        document.getElementById("selEncCcw").value = String(state.encoder.ccwCode);
+        document.getElementById("selEncClick").value = String(state.encoder.clickCode);
+        document.getElementById("selEncLongClick").value = String(state.encoder.longClickCode);
+        document.getElementById("selEncSteps").value = String(state.encoder.stepsPerClick);
+        document.getElementById("selDefaultLayout").value = String(state.encoder.defaultLayout);
+        document.getElementById("chkEncInvert").checked = Boolean(state.encoder.invert);
+        setModPillStyles();
+        return;
+      }
+
+      btnPanel.style.display = "flex";
+      encPanel.style.display = "none";
+      copyBtn.style.display = "inline-flex";
+      pasteBtn.style.display = "inline-flex";
+      pasteBtn.disabled = !clipboardBtn;
+
+      const btnIdx = selectedTarget.btnIdx;
+      const hwName = btnIdx === 9 ? "Tecla Superior Derecha [-]" : `Tecla [${btnIdx + 1}]`;
+      document.getElementById("editorTitle").textContent =
+        `Configurar ${hwName} — Layout ${activeLayout + 1}`;
+      document.getElementById("lblLayoutNum").textContent = String(activeLayout + 1);
+      document.getElementById("inpLayoutName").value = state.layouts[activeLayout].name || "";
+
+      const btn = state.layouts[activeLayout].buttons[btnIdx];
+      document.getElementById("inpBtnLabel").value = btn.label || "";
+      document.getElementById("selActionType").value = String(btn.type);
+
+      // Show matching sub-panel
+      document.getElementById("panelTypeKey").style.display    = btn.type === 1 ? "flex" : "none";
+      document.getElementById("panelTypeMedia").style.display  = btn.type === 2 ? "flex" : "none";
+      document.getElementById("panelTypeText").style.display   = btn.type === 3 ? "flex" : "none";
+      document.getElementById("panelTypeSeq").style.display    = btn.type === 4 ? "flex" : "none";
+      document.getElementById("panelTypeLayout").style.display = btn.type === 5 ? "flex" : "none";
+
+      if (btn.type === 1) {
+        document.querySelectorAll("#keyModsGroup input[type=checkbox]").forEach(cb => {
+          const bit = Number(cb.dataset.mod);
+          cb.checked = Boolean(btn.mods & bit);
+        });
+        document.getElementById("selKey1").value = String(btn.arg1 || 0);
+        document.getElementById("selKey2").value = String(btn.arg2 || 0);
+      } else if (btn.type === 2) {
+        const code = (btn.arg1 & 0xFF) | ((btn.arg2 & 0xFF) << 8);
+        document.getElementById("selMediaCode").value = String(code);
+      } else if (btn.type === 3) {
+        document.getElementById("inpMacroText").value = btn.text || "";
+        document.getElementById("chkTextEnter").checked = Boolean(btn.mods & 1);
+        document.getElementById("chkTextTab").checked = Boolean(btn.mods & 2);
+      } else if (btn.type === 4) {
+        const mods1 = btn.mods & 0x0F;
+        const mods2 = (btn.mods >> 4) & 0x0F;
+        document.querySelectorAll("#seqMods1 input[type=checkbox]").forEach(cb => {
+          cb.checked = Boolean(mods1 & Number(cb.dataset.mod));
+        });
+        document.querySelectorAll("#seqMods2 input[type=checkbox]").forEach(cb => {
+          cb.checked = Boolean(mods2 & Number(cb.dataset.mod));
+        });
+        document.getElementById("selSeqKey1").value = String(btn.arg1 || 0);
+        document.getElementById("selSeqKey2").value = String(btn.arg2 || 0);
+      } else if (btn.type === 5) {
+        document.getElementById("selTargetLayout").value = String(btn.arg1);
+      }
+
+      setModPillStyles();
+    }
+
+    function setModPillStyles() {
+      document.querySelectorAll(".mod-pill").forEach(lbl => {
+        const cb = lbl.querySelector("input[type=checkbox]");
+        if (cb) {
+          lbl.classList.toggle("checked", cb.checked);
+        }
+      });
+    }
+
+    // =========================================================================
+    // Form Change Handlers
+    // =========================================================================
+    function selectLayout(idx, syncHw) {
+      activeLayout = idx;
+      renderAll();
+      if (syncHw && writer) {
+        sendSerialCommand(`SET_LAYOUT ${idx}`);
+      }
+    }
+
+    function onLayoutNameChange() {
+      state.layouts[activeLayout].name = document.getElementById("inpLayoutName").value;
+      renderLayoutTabs();
+      saveToLocalStorage();
+    }
+
+    function onBtnLabelChange() {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      btn.label = document.getElementById("inpBtnLabel").value;
+      renderPadGrid();
+      saveToLocalStorage();
+    }
+
+    function onActionTypeChange() {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      const newType = Number(document.getElementById("selActionType").value);
+      btn.type = newType;
+      btn.mods = 0;
+      btn.arg1 = 0;
+      btn.arg2 = 0;
+      if (newType === 1) btn.arg1 = 4; // Default 'A'
+      if (newType === 2) { btn.arg1 = 0xCD; btn.arg2 = 0; } // Play/Pause
+      if (newType === 5) btn.arg1 = 255; // Next layout
+      renderAll();
+    }
+
+    function onKeyFormChange() {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      let mods = 0;
+      document.querySelectorAll("#keyModsGroup input[type=checkbox]").forEach(cb => {
+        if (cb.checked) mods |= Number(cb.dataset.mod);
+      });
+      btn.mods = mods;
+      btn.arg1 = Number(document.getElementById("selKey1").value);
+      btn.arg2 = Number(document.getElementById("selKey2").value);
+      setModPillStyles();
+      renderPadGrid();
+      saveToLocalStorage();
+    }
+
+    function onTextFormChange() {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      btn.text = document.getElementById("inpMacroText").value;
+      let mods = 0;
+      if (document.getElementById("chkTextEnter").checked) mods |= 1;
+      if (document.getElementById("chkTextTab").checked) mods |= 2;
+      btn.mods = mods;
+      setModPillStyles();
+      renderPadGrid();
+      updateMemoryBar();
+      saveToLocalStorage();
+    }
+
+    function onMediaFormChange() {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      const code = Number(document.getElementById("selMediaCode").value);
+      btn.arg1 = code & 0xFF;
+      btn.arg2 = (code >> 8) & 0xFF;
+      renderPadGrid();
+      saveToLocalStorage();
+    }
+
+    function onSeqFormChange() {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      let m1 = 0, m2 = 0;
+      document.querySelectorAll("#seqMods1 input[type=checkbox]").forEach(cb => {
+        if (cb.checked) m1 |= Number(cb.dataset.mod);
+      });
+      document.querySelectorAll("#seqMods2 input[type=checkbox]").forEach(cb => {
+        if (cb.checked) m2 |= Number(cb.dataset.mod);
+      });
+      btn.mods = (m1 & 0x0F) | ((m2 & 0x0F) << 4);
+      btn.arg1 = Number(document.getElementById("selSeqKey1").value);
+      btn.arg2 = Number(document.getElementById("selSeqKey2").value);
+      setModPillStyles();
+      renderPadGrid();
+      saveToLocalStorage();
+    }
+
+    function onLayoutTargetChange() {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      btn.arg1 = Number(document.getElementById("selTargetLayout").value);
+      renderPadGrid();
+      saveToLocalStorage();
+    }
+
+    function onEncoderFormChange() {
+      state.encoder.cwCode        = Number(document.getElementById("selEncCw").value);
+      state.encoder.ccwCode       = Number(document.getElementById("selEncCcw").value);
+      state.encoder.clickCode     = Number(document.getElementById("selEncClick").value);
+      state.encoder.longClickCode = Number(document.getElementById("selEncLongClick").value);
+      state.encoder.stepsPerClick = Number(document.getElementById("selEncSteps").value);
+      state.encoder.defaultLayout = Number(document.getElementById("selDefaultLayout").value);
+      state.encoder.invert        = document.getElementById("chkEncInvert").checked ? 1 : 0;
+      setModPillStyles();
+      renderPadGrid();
+      saveToLocalStorage();
+    }
+
+    function applyPreset(preset) {
+      if (selectedTarget.kind !== "btn") return;
+      const btn = state.layouts[activeLayout].buttons[selectedTarget.btnIdx];
+      btn.type  = preset.type;
+      btn.mods  = preset.mods;
+      btn.arg1  = preset.arg1;
+      btn.arg2  = preset.arg2;
+      btn.label = preset.label;
+      renderAll();
+    }
+
+    function copyButtonConfig() {
+      if (selectedTarget.kind !== "btn") return;
+      clipboardBtn = JSON.parse(
+        JSON.stringify(state.layouts[activeLayout].buttons[selectedTarget.btnIdx])
+      );
+      document.getElementById("btnPasteAction").disabled = false;
+      showToast("📋 Configuración de tecla copiada");
+    }
+
+    function pasteButtonConfig() {
+      if (selectedTarget.kind !== "btn" || !clipboardBtn) return;
+      state.layouts[activeLayout].buttons[selectedTarget.btnIdx] = JSON.parse(
+        JSON.stringify(clipboardBtn)
+      );
+      renderAll();
+      showToast("📥 Configuración pegada en esta tecla");
+    }
+
+    // Keyboard key capture helper
+    let captureTargetSelectId = null;
+    function startKeyCapture(selectId) {
+      captureTargetSelectId = selectId;
+      const btn = document.getElementById("btnCaptureKey");
+      btn.textContent = "⏳ Tocá una tecla...";
+      btn.classList.add("primary");
+
+      const handler = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.removeEventListener("keydown", handler, true);
+        btn.textContent = "⌨️ Capturar";
+        btn.classList.remove("primary");
+
+        const found = HID_KEYS.find(k => k.jsCode === e.code);
+        if (found) {
+          document.getElementById(captureTargetSelectId).value = String(found.code);
+          onKeyFormChange();
+          showToast(`Tecla capturada: ${found.label}`);
+        } else {
+          showToast("Esa tecla es un modificador o no está en la tabla estándar");
+        }
+        captureTargetSelectId = null;
+      };
+      window.addEventListener("keydown", handler, true);
+    }
+
+    // =========================================================================
+    // EEPROM Text Pool Packing (Deduplicated UTF-8/ASCII null-terminated strings)
+    // =========================================================================
+    function packTextPool() {
+      const encoder = new TextEncoder();
+      const bytes = [];
+      const offsetMap = new Map();
+      let overflow = false;
+
+      for (let l = 0; l < 4; l++) {
+        for (let b = 0; b < 10; b++) {
+          const btn = state.layouts[l].buttons[b];
+          if (btn.type === 3) {
+            const str = btn.text || "";
+            if (offsetMap.has(str)) {
+              const off = offsetMap.get(str);
+              btn.arg1 = off & 0xFF;
+              btn.arg2 = (off >> 8) & 0xFF;
+            } else {
+              const encoded = encoder.encode(str);
+              const off = bytes.length;
+              if (off + encoded.length + 1 > EEPROM_TXT_SIZE) {
+                overflow = true;
+                btn.arg1 = 0;
+                btn.arg2 = 0;
+              } else {
+                offsetMap.set(str, off);
+                for (const byteVal of encoded) bytes.push(byteVal);
+                bytes.push(0); // null terminator
+                btn.arg1 = off & 0xFF;
+                btn.arg2 = (off >> 8) & 0xFF;
+              }
+            }
+          }
+        }
+      }
+      if (bytes.length === 0) bytes.push(0);
+      return { bytes, used: bytes.length === 1 && bytes[0] === 0 ? 0 : bytes.length, overflow };
+    }
+
+    function updateMemoryBar() {
+      const { used, overflow } = packTextPool();
+      const pct = Math.min(100, Math.round((used / EEPROM_TXT_SIZE) * 100));
+      document.getElementById("memUsageText").textContent =
+        `${used} / ${EEPROM_TXT_SIZE} bytes` + (overflow ? " (¡Excedido!)" : "");
+      const fill = document.getElementById("memFill");
+      fill.style.width = `${pct}%`;
+      fill.style.background = overflow ? "var(--red)" : "var(--accent)";
+    }
+
+    // =========================================================================
+    // Web Serial API Connection & Sync
+    // =========================================================================
+    async function toggleConnection() {
+      if (port) {
+        await disconnectSerial();
+      } else {
+        await connectSerial();
+      }
+    }
+
+    async function connectSerial() {
+      if (!("serial" in navigator)) {
+        alert("Tu navegador no soporta Web Serial API. Usá Google Chrome, Brave, Edge o Arc.");
+        return;
+      }
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        const textDecoder = new TextDecoderStream();
+        readableClosed = port.readable.pipeTo(textDecoder.writable);
+        reader = textDecoder.readable.getReader();
+
+        const textEncoder = new TextEncoderStream();
+        writableClosed = textEncoder.readable.pipeTo(port.writable);
+        writer = textEncoder.writable.getWriter();
+
+        setConnectedUi(true);
+        readLoop();
+
+        // Automatically read configuration from the Macropad upon connection
+        setTimeout(() => readFromMacropad(), 150);
+      } catch (err) {
+        console.error(err);
+        showToast("No se pudo conectar al puerto serie");
+        setConnectedUi(false);
+      }
+    }
+
+    async function disconnectSerial() {
+      try {
+        if (reader) {
+          await reader.cancel();
+          if (readableClosed) await readableClosed.catch(() => {});
+          reader = null;
+          readableClosed = null;
+        }
+        if (writer) {
+          await writer.close();
+          if (writableClosed) await writableClosed.catch(() => {});
+          writer = null;
+          writableClosed = null;
+        }
+        if (port) {
+          await port.close();
+          port = null;
+        }
+      } catch (e) {
+        console.warn("Disconnect error:", e);
+      }
+      setConnectedUi(false);
+      showToast("Macropad desconectado");
+    }
+
+    function setConnectedUi(connected) {
+      const pill = document.getElementById("connStatus");
+      const text = document.getElementById("connText");
+      const btnConn = document.getElementById("btnConnect");
+      document.getElementById("btnSaveEeprom").disabled = !connected;
+      document.getElementById("btnReadEeprom").disabled = !connected;
+
+      if (connected) {
+        pill.classList.add("connected");
+        text.textContent = "Conectado (USB Serial)";
+        btnConn.textContent = "🔌 Desconectar";
+        btnConn.classList.remove("primary");
+      } else {
+        pill.classList.remove("connected");
+        text.textContent = "Desconectado";
+        btnConn.textContent = "🔌 Conectar Macropad";
+        btnConn.classList.add("primary");
+      }
+    }
+
+    async function readLoop() {
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) {
+            serialBuffer += value;
+            let idx;
+            while ((idx = serialBuffer.indexOf("\n")) >= 0) {
+              const line = serialBuffer.slice(0, idx).trim();
+              serialBuffer = serialBuffer.slice(idx + 1);
+              if (line) onSerialLine(line);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Serial read loop ended:", e);
+      } finally {
+        setConnectedUi(false);
+      }
+    }
+
+    function onSerialLine(line) {
+      // Live Hardware Events
+      if (line.startsWith("EVT KEY ")) {
+        const parts = line.split(" ");
+        const l = Number(parts[2]);
+        const b = Number(parts[3]);
+        if (l !== activeLayout) {
+          activeLayout = l;
+          renderAll();
+        }
+        flashElement(`pad-btn-${b}`);
+        if (document.getElementById("chkFollowHw").checked) {
+          selectedTarget = { kind: "btn", btnIdx: b };
+          renderAll();
+        }
+        return;
+      }
+      if (line.startsWith("EVT LAYOUT ")) {
+        const l = Number(line.split(" ")[2]);
+        activeLayout = l;
+        flashElement("pad-star");
+        renderAll();
+        return;
+      }
+      if (line.startsWith("EVT ENC ")) {
+        flashElement("pad-enc");
+        if (document.getElementById("chkFollowHw").checked) {
+          selectedTarget = { kind: "enc" };
+          renderAll();
+        }
+        return;
+      }
+
+      // Config Dump accumulation
+      if (dumpLines !== null) {
+        if (line === "END") {
+          const lines = dumpLines;
+          dumpLines = null;
+          if (dumpResolve) dumpResolve(lines);
+        } else {
+          dumpLines.push(line);
+        }
+      }
+    }
+
+    function flashElement(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add("live-press");
+      setTimeout(() => el.classList.remove("live-press"), 220);
+    }
+
+    async function sendSerialCommand(cmd) {
+      if (!writer) return;
+      await writer.write(cmd + "\n");
+    }
+
+    async function readFromMacropad() {
+      if (!writer) return;
+      dumpLines = [];
+      const p = new Promise(resolve => { dumpResolve = resolve; });
+      await sendSerialCommand("DUMP");
+
+      const lines = await Promise.race([
+        p,
+        new Promise((_, rej) => setTimeout(() => rej(new Error("Timeout")), 2500))
+      ]).catch(err => {
+        dumpLines = null;
+        showToast("⚠️ Tiempo de espera agotado al leer del Macropad");
+        return null;
+      });
+
+      if (!lines) return;
+
+      const txtPool = new Uint8Array(EEPROM_TXT_SIZE);
+      for (const line of lines) {
+        const parts = line.split(" ");
+        if (parts[0] === "CFG" && parts.length >= 9) {
+          state.encoder.stepsPerClick = Number(parts[1]);
+          state.encoder.invert        = Number(parts[2]);
+          state.encoder.cwCode        = Number(parts[3]);
+          state.encoder.ccwCode       = Number(parts[4]);
+          state.encoder.clickCode     = Number(parts[5]);
+          state.encoder.longClickCode = Number(parts[6]);
+          state.encoder.defaultLayout = Number(parts[7]);
+          activeLayout                = Number(parts[8]);
+        } else if (parts[0] === "BTN" && parts.length >= 7) {
+          const l = Number(parts[1]);
+          const b = Number(parts[2]);
+          if (l >= 0 && l < 4 && b >= 0 && b < 10) {
+            const btn = state.layouts[l].buttons[b];
+            btn.type = Number(parts[3]);
+            btn.mods = Number(parts[4]);
+            btn.arg1 = Number(parts[5]);
+            btn.arg2 = Number(parts[6]);
+          }
+        } else if (parts[0] === "TXT" && parts.length >= 3) {
+          const off = Number(parts[1]);
+          const hex = parts[2];
+          for (let i = 0; i < hex.length / 2; i++) {
+            if (off + i < EEPROM_TXT_SIZE) {
+              txtPool[off + i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+            }
+          }
+        }
+      }
+
+      // Reconstruct strings for ACT_TEXT buttons
+      const decoder = new TextDecoder();
+      for (let l = 0; l < 4; l++) {
+        for (let b = 0; b < 10; b++) {
+          const btn = state.layouts[l].buttons[b];
+          if (btn.type === 3) {
+            const off = (btn.arg1 & 0xFF) | ((btn.arg2 & 0xFF) << 8);
+            let end = off;
+            while (end < EEPROM_TXT_SIZE && txtPool[end] !== 0 && txtPool[end] !== 0xFF) {
+              end++;
+            }
+            btn.text = decoder.decode(txtPool.slice(off, end));
+          }
+        }
+      }
+
+      renderAll();
+      showToast("✅ Configuración leída desde la EEPROM del Macropad");
+    }
+
+    async function saveToMacropad() {
+      if (!writer) return;
+      const { bytes, overflow } = packTextPool();
+      if (overflow) {
+        alert("Los textos superan los 848 bytes disponibles en la EEPROM del Arduino.");
+        return;
+      }
+
+      const btnSave = document.getElementById("btnSaveEeprom");
+      btnSave.disabled = true;
+      btnSave.textContent = "⏳ Guardando...";
+
+      try {
+        const e = state.encoder;
+        await sendSerialCommand(
+          `SET_ENC ${e.stepsPerClick} ${e.invert ? 1 : 0} ${e.cwCode} ${e.ccwCode} ${e.clickCode} ${e.longClickCode} ${e.defaultLayout}`
+        );
+        await sleep(10);
+
+        for (let l = 0; l < 4; l++) {
+          for (let b = 0; b < 10; b++) {
+            const btn = state.layouts[l].buttons[b];
+            await sendSerialCommand(
+              `SET_BTN ${l} ${b} ${btn.type} ${btn.mods} ${btn.arg1} ${btn.arg2}`
+            );
+            await sleep(5);
+          }
+        }
+
+        const CHUNK = 32;
+        for (let off = 0; off < bytes.length; off += CHUNK) {
+          const slice = bytes.slice(off, off + CHUNK);
+          const hex = slice.map(x => x.toString(16).padStart(2, "0").toUpperCase()).join("");
+          await sendSerialCommand(`SET_TXT ${off} ${hex}`);
+          await sleep(12);
+        }
+
+        showToast("💾 ¡Guardado en la EEPROM del Macropad!");
+      } catch (err) {
+        console.error(err);
+        showToast("❌ Error al guardar en el Macropad");
+      } finally {
+        btnSave.disabled = false;
+        btnSave.textContent = "💾 Guardar en Macropad";
+      }
+    }
+
+    // =========================================================================
+    // Export / Import JSON
+    // =========================================================================
+    function exportJson() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "macropad-v2-config.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed && parsed.layouts && parsed.encoder) {
+            state = parsed;
+            renderAll();
+            showToast("⬆️ Perfil importado. Tocá 'Guardar en Macropad' para grabarlo en el chip.");
+          }
+        } catch (err) {
+          alert("Archivo JSON inválido.");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    // =========================================================================
+    // Utilities & Initialization
+    // =========================================================================
+    function sleep(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+    }
+
+    function initCatalogSelects() {
+      const keySelectIds = ["selKey1", "selKey2", "selSeqKey1", "selSeqKey2"];
+      for (const id of keySelectIds) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = HID_KEYS.map(
+          k => `<option value="${k.code}">${escapeHtml(k.label)}</option>`
+        ).join("");
+      }
+
+      const mediaSelectIds = ["selMediaCode", "selEncCw", "selEncCcw", "selEncClick", "selEncLongClick"];
+      for (const id of mediaSelectIds) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = MEDIA_ACTIONS.map(
+          m => `<option value="${m.code}">${escapeHtml(m.label)}</option>`
+        ).join("");
+      }
+
+      const pGrid = document.getElementById("presetGrid");
+      pGrid.innerHTML = "";
+      MACOS_PRESETS.forEach(p => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "preset-chip";
+        chip.textContent = p.name;
+        chip.onclick = () => applyPreset(p);
+        pGrid.appendChild(chip);
+      });
+    }
+
+    initCatalogSelects();
+    loadFromLocalStorage();
+    renderAll();
+  </script>
+</body>
+</html>
