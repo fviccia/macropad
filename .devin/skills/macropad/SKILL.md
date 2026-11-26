@@ -48,9 +48,9 @@ El microcontrolador es un **ATmega32U4** (5V / 16MHz), compilado con el FQBN `ar
 | Rango de Direcciones | Tamaño | Contenido |
 |---|---|---|
 | `0 .. 3` | 4 bytes | **Magic Header:** `'M'`, `'P'`, `'V'`, `2` (si no coincide al arrancar, `ensureEepromInitialized()` ejecuta `resetDefaults()`). |
-| `4 .. 15` | 12 bytes | **`struct GlobalConfig`:**<br>- `4`: `encStepsPerClick` (`uint8_t`, default `4`)<br>- `5`: `encInvert` (`uint8_t`, default `1`)<br>- `6..7`: `encCwCode` (`uint16_t`, default `MEDIA_VOLUME_UP = 0x00E9`)<br>- `8..9`: `encCcwCode` (`uint16_t`, default `MEDIA_VOLUME_DOWN = 0x00EA`)<br>- `10..11`: `encClickCode` (`uint16_t`, default `MEDIA_VOLUME_MUTE = 0x00E2`)<br>- `12..13`: `encLongClickCode` (`uint16_t`, default `0` = desactivado para que el click corto sea instantáneo al presionar)<br>- `14`: `defaultLayout` (`bits 0..1` = layout inicial `0..3`; `bits 4..5` = `kbdMode` `0=Spanish-ISO`, `1=ABC/US`, `2=ABC+Switch ñ`)<br>- `15`: `ledBrightnessRaw` (`0x80 | (0..100%)`, default `20%`; regulado por PWM en `Timer3` sobre `PORTB`) |
+| `4 .. 15` | 12 bytes | **`struct GlobalConfig`:**<br>- `4`: `encStepsPerClick` (`uint8_t`, default `4`)<br>- `5`: `encInvert` (`uint8_t`, default `1`)<br>- `6..7`: `encCwCode` (`uint16_t`, default `MEDIA_VOLUME_UP = 0x00E9`)<br>- `8..9`: `encCcwCode` (`uint16_t`, default `MEDIA_VOLUME_DOWN = 0x00EA`)<br>- `10..11`: `encClickCode` (`uint16_t`, default `MEDIA_VOLUME_MUTE = 0x00E2`)<br>- `12..13`: `encLongClickCode` (`uint16_t`, default `0` = desactivado para que el click corto sea instantáneo al presionar)<br>- `14`: `defaultLayout` (`uint8_t`, `0..3`, default `0`)<br>- `15`: `ledBrightnessRaw` (`0x80 | (0..100%)`, default `20%`; regulado por PWM en `Timer3` sobre `PORTB`) |
 | `16 .. 175` | 160 bytes | **40 Slots de Botón** (`4 layouts × 10 botones × 4 bytes`):<br>Dirección = `16 + ((layout * 10 + btnIdx) * 4)`.<br>Cada botón es `struct ButtonAction { uint8_t type, mods, arg1, arg2; }`. |
-| `176 .. 1023` | 848 bytes | **Pool Dinámico de Textos (`ACT_TEXT`):**<br>Strings UTF-8 terminados en `\0` (`0x00`). La web deduplica textos repetidos y calcula el offset (`0..847`) guardado en `arg1 | (arg2 << 8)`. |
+| `176 .. 1023` | 848 bytes | **Pool Dinámico de Textos (`ACT_TEXT`):**<br>Strings ASCII terminados en `\0` (`0x00`). La web deduplica textos repetidos y calcula el offset (`0..847`) guardado en `arg1 | (arg2 << 8)`. |
 
 ### Tipos de Acción (`ActionType` en `ButtonAction.type`)
 
@@ -66,9 +66,7 @@ El microcontrolador es un **ATmega32U4** (5V / 16MHz), compilado con el FQBN `ar
 4. **`ACT_TEXT (3)`**: Escribir texto o comando desde el pool de EEPROM.
    - `offset = arg1 | (arg2 << 8)` (relativo a `EEPROM_TXT_ADDR = 176`).
    - `mods`: `bit 0 (0x01)` = enviar `Enter` al final; `bit 1 (0x02)` = enviar `Tab` al final.
-   - **Independencia de distribución de teclado en macOS:**
-     - `typeUtf8TextFromEeprom()` detecta secuencias UTF-8 de 2 bytes (`0xC3` / `0xC2`) para `ñ`, `Ñ`, `á, é, í, ó, ú`, `Á, É, Í, Ó, Ú`, `ü, Ü`, `¿, ¡` y las escribe usando las *dead keys* universales de macOS (`⌥ Option + N` → `N` para `ñ`, que funciona tanto en teclado `ABC`/`US` como en `Spanish`/`Spanish - ISO`).
-     - Para los símbolos `-`, `/`, `*`, `+`, envía los códigos del teclado numérico (`KEYPAD_SUBTRACT`, `KEYPAD_DIVIDE`, `KEYPAD_MULTIPLY`, `KEYPAD_ADD`), que producen el mismo carácter sin importar qué idioma de teclado esté activo en el sistema operativo.
+   - Para los símbolos `-`, `/`, `*`, `+`, envía los códigos del teclado numérico (`KEYPAD_SUBTRACT`, `KEYPAD_DIVIDE`, `KEYPAD_MULTIPLY`, `KEYPAD_ADD`), que producen el mismo carácter sin importar qué idioma de teclado esté activo en el sistema operativo.
 5. **`ACT_SEQ (4)`**: Secuencia de 2 atajos separados por 45 ms (ideal para acordes tipo VS Code `Cmd+K → Cmd+S` o `tmux` `Ctrl+B → D`).
    - Paso 1: modificadores `mods & 0x0F` + tecla `arg1`.
    - Paso 2: modificadores `(mods >> 4) & 0x0F` + tecla `arg2`.
@@ -81,13 +79,12 @@ El microcontrolador es un **ATmega32U4** (5V / 16MHz), compilado con el FQBN `ar
 ### Comandos del Navegador → Arduino
 - `PING` → Responde `PONG MPV2`
 - `DUMP` → Devuelve el estado completo:
-  - `CFG <steps> <invert> <cw> <ccw> <click> <longClick> <defaultLayout> <currentState> <ledBrightnessPct> <kbdMode>`
+  - `CFG <steps> <invert> <cw> <ccw> <click> <longClick> <defaultLayout> <currentState> <ledBrightnessPct>`
   - 40 líneas `BTN <layout> <btnIdx> <type> <mods> <arg1> <arg2>`
   - Líneas `TXT <offset> <HEX_BYTES>` (para la porción usada del pool de textos)
   - `END`
-- `SET_ENC <steps> <invert> <cw> <ccw> <click> <longClick> <defaultLayout> [ledBrightnessPct] [kbdMode]` → Guarda en EEPROM y responde `OK`.
+- `SET_ENC <steps> <invert> <cw> <ccw> <click> <longClick> <defaultLayout> [ledBrightnessPct]` → Guarda en EEPROM y responde `OK`.
 - `SET_BRIGHTNESS <0..100>` → Ajusta el brillo PWM de los LEDs en tiempo real, lo guarda en EEPROM y responde `OK`.
-- `SET_KBD <0|1|2>` → Ajusta la distribución de teclado de macOS (`0` = Español ISO, `1` = ABC/US, `2` = ABC + Auto-switch `Ctrl+Espacio` para `ñ` en contraseñas), lo guarda en EEPROM y responde `OK`.
 - `SET_BTN <layout> <btnIdx> <type> <mods> <arg1> <arg2>` → Guarda en EEPROM (`EEPROM.update`) y responde `OK`.
 - `SET_TXT <offset> <HEX_BYTES>` → Escribe bytes decodificados desde hex en `EEPROM_TXT_ADDR + offset` y responde `OK`.
 - `SET_LAYOUT <0..3>` → Cambia el layout activo y actualiza los LEDs físicos en tiempo real, responde `OK`.

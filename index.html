@@ -522,17 +522,6 @@
       </div>
 
       <div style="margin-top: 10px;" class="memory-bar-wrap">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <span>⌨️ Distribución de teclado en macOS</span>
-        </div>
-        <select id="selKbdMode" style="width:100%;" onchange="onKbdModeChange(this.value)">
-          <option value="0">🇪🇸 Español (Spanish - ISO) — ñ nativa (ideal p/ contraseñas)</option>
-          <option value="1">🇺🇸 Inglés (ABC / US) — ñ vía Option+N</option>
-          <option value="2">🔄 ABC + Auto-switch a Español para ñ en contraseñas (⌃Espacio)</option>
-        </select>
-      </div>
-
-      <div style="margin-top: 10px;" class="memory-bar-wrap">
         <div style="display:flex;justify-content:space-between;">
           <span>Memoria EEPROM de textos en chip</span>
           <span id="memUsageText">0 / 848 bytes</span>
@@ -620,8 +609,7 @@
         <div id="panelTypeText" class="form-section" style="display:none;">
           <div class="field">
             <label>Texto o comando a escribir</label>
-            <textarea id="inpMacroText" rows="3" placeholder="Ej: ssh homelab-01 (soporta ñ, Ñ, áéíóú, ¿¡)" oninput="onTextFormChange()"></textarea>
-            <span class="subtle-hint">Soporta caracteres en español (ñ, Ñ, á, é, í, ó, ú, ü, ¿, ¡) para teclado macOS ABC.</span>
+            <textarea id="inpMacroText" rows="3" placeholder="Ej: ssh homelab-01" oninput="onTextFormChange()"></textarea>
           </div>
           <div class="mods-group">
             <label class="mod-pill"><input type="checkbox" id="chkTextEnter" onchange="onTextFormChange()" /> Presionar Enter (↵) al final</label>
@@ -747,7 +735,6 @@
         const ch = String.fromCharCode(65 + i);
         return { code: 4 + i, label: `Letra ${ch}`, short: ch, jsCode: `Key${ch}` };
       }),
-      { code: 250, label: "Letra Ñ / ñ (Universal según teclado macOS seleccionado)", short: "ñ" },
       // Numbers 1-9, 0 (30..39)
       { code: 30, label: "Número 1 (!)", short: "1", jsCode: "Digit1" },
       { code: 31, label: "Número 2 (@)", short: "2", jsCode: "Digit2" },
@@ -780,7 +767,7 @@
       { code: 47, label: "Corchete [ ({)", short: "[", jsCode: "BracketLeft" },
       { code: 48, label: "Corchete ] (})", short: "]", jsCode: "BracketRight" },
       { code: 49, label: "Barra invertida \\ (|)", short: "\\", jsCode: "Backslash" },
-      { code: 51, label: "Ñ directa en Español / Punto y coma ; en US", short: "ñ/;", jsCode: "Semicolon" },
+      { code: 51, label: "Punto y coma ; (:)", short: ";", jsCode: "Semicolon" },
       { code: 52, label: "Comilla ' (\")", short: "'", jsCode: "Quote" },
       { code: 53, label: "Grave ` (~)", short: "`", jsCode: "Backquote" },
       { code: 54, label: "Coma , (<)", short: ",", jsCode: "Comma" },
@@ -819,7 +806,6 @@
     ];
 
     const MACOS_PRESETS = [
-      { name: "🔤 Letra ñ",            label: "ñ",             type: 1, mods: 0,         arg1: 250, arg2: 0 },
       { name: "📸 Captura (Área)",      label: "Captura Área",  type: 1, mods: 8 | 2,     arg1: 33, arg2: 0 }, // Cmd+Shift+4
       { name: "📋 Captura (Clipboard)", label: "Captura Clip",  type: 1, mods: 8 | 4 | 2, arg1: 33, arg2: 0 }, // Cmd+Ctrl+Shift+4
       { name: "🎥 Panel Captura",       label: "Panel Captura", type: 1, mods: 8 | 2,     arg1: 34, arg2: 0 }, // Cmd+Shift+5
@@ -895,8 +881,7 @@
           clickCode: 0x00E2,
           longClickCode: 0,
           defaultLayout: 0,
-          ledBrightness: 20,
-          kbdMode: 0
+          ledBrightness: 20
         },
         layouts
       };
@@ -911,9 +896,6 @@
           if (parsed && parsed.layouts && parsed.layouts.length === 4 && parsed.encoder) {
             if (typeof parsed.encoder.ledBrightness !== "number") {
               parsed.encoder.ledBrightness = 20;
-            }
-            if (typeof parsed.encoder.kbdMode !== "number") {
-              parsed.encoder.kbdMode = 0;
             }
             state = parsed;
           }
@@ -1096,9 +1078,6 @@
       if (rng) rng.value = String(pct);
       if (lbl) lbl.textContent = pct === 0 ? "Apagados (0%)" : `${pct}%`;
 
-      const selKbd = document.getElementById("selKbdMode");
-      if (selKbd) selKbd.value = String(state.encoder.kbdMode || 0);
-
       const alpha = pct === 0 ? 0 : Math.max(0.2, pct / 100);
       for (let i = 0; i < 4; i++) {
         const item = document.createElement("div");
@@ -1237,16 +1216,6 @@
       if (writer) {
         clearTimeout(brightnessLiveTimer);
         sendSerialCommand(`SET_BRIGHTNESS ${pct}`);
-      }
-    }
-
-    function onKbdModeChange(val) {
-      const m = Math.max(0, Math.min(2, Number(val)));
-      state.encoder.kbdMode = m;
-      saveToLocalStorage();
-      if (writer) {
-        sendSerialCommand(`SET_KBD ${m}`);
-        showToast("⌨️ Distribución de teclado actualizada en el Macropad");
       }
     }
 
@@ -1659,9 +1628,6 @@
           if (parts.length >= 10) {
             state.encoder.ledBrightness = Number(parts[9]);
           }
-          if (parts.length >= 11) {
-            state.encoder.kbdMode = Number(parts[10]);
-          }
         } else if (parts[0] === "BTN" && parts.length >= 7) {
           const l = Number(parts[1]);
           const b = Number(parts[2]);
@@ -1718,9 +1684,8 @@
       try {
         const e = state.encoder;
         const bPct = typeof e.ledBrightness === "number" ? e.ledBrightness : 20;
-        const kMode = typeof e.kbdMode === "number" ? e.kbdMode : 0;
         await sendSerialCommand(
-          `SET_ENC ${e.stepsPerClick} ${e.invert ? 1 : 0} ${e.cwCode} ${e.ccwCode} ${e.clickCode} ${e.longClickCode} ${e.defaultLayout} ${bPct} ${kMode}`
+          `SET_ENC ${e.stepsPerClick} ${e.invert ? 1 : 0} ${e.cwCode} ${e.ccwCode} ${e.clickCode} ${e.longClickCode} ${e.defaultLayout} ${bPct}`
         );
         await sleep(10);
 
