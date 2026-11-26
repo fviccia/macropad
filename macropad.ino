@@ -127,14 +127,29 @@ void setLedBrightnessPct(uint8_t pct) {
   cfg.ledBrightnessRaw = 0x80 | pct;
 }
 
+uint8_t getDefaultLayoutIdx() {
+  return cfg.defaultLayout & 0x03;
+}
+
+uint8_t getKbdMode() {
+  uint8_t m = (cfg.defaultLayout >> 4) & 0x03;
+  return (m > 2) ? 0 : m;
+}
+
+void setLayoutAndKbdMode(uint8_t defLayout, uint8_t kbdMode) {
+  if (defLayout >= NUM_LAYOUTS) defLayout = 0;
+  if (kbdMode > 2) kbdMode = 0;
+  cfg.defaultLayout = (defLayout & 0x03) | ((kbdMode & 0x03) << 4);
+}
+
 void loadGlobalConfig() {
   EEPROM.get(EEPROM_CFG_ADDR, cfg);
   if (cfg.encStepsPerClick == 0 || cfg.encStepsPerClick > 16) {
     cfg.encStepsPerClick = 4;
   }
-  if (cfg.defaultLayout >= NUM_LAYOUTS) {
-    cfg.defaultLayout = 0;
-  }
+  uint8_t defLay = getDefaultLayoutIdx();
+  uint8_t kbdMode = getKbdMode();
+  setLayoutAndKbdMode(defLay, kbdMode);
   if ((cfg.ledBrightnessRaw & 0x80) == 0 || (cfg.ledBrightnessRaw & 0x7F) > 100) {
     setLedBrightnessPct(DEFAULT_LED_BRIGHTNESS_PCT);
   }
@@ -151,7 +166,7 @@ void resetDefaults() {
   cfg.encCcwCode       = MEDIA_VOLUME_DOWN;
   cfg.encClickCode     = MEDIA_VOLUME_MUTE;
   cfg.encLongClickCode = 0; // Immediate click action without waiting for long press
-  cfg.defaultLayout    = 0;
+  setLayoutAndKbdMode(0, 0); // Default: Layout 1, Spanish - ISO keyboard mode
   setLedBrightnessPct(DEFAULT_LED_BRIGHTNESS_PCT);
   saveGlobalConfig();
 
@@ -310,62 +325,125 @@ void executeConsumerCode(uint16_t code) {
   Consumer.write((ConsumerKeycode)code);
 }
 
-void sendDeadKeyChar(KeyboardKeycode deadKey, KeyboardKeycode baseKey, bool shiftBase) {
-  Keyboard.press(KEY_LEFT_ALT);
-  Keyboard.press(deadKey);
-  delay(8);
-  Keyboard.releaseAll();
-  delay(8);
-  if (shiftBase) Keyboard.press(KEY_LEFT_SHIFT);
-  Keyboard.press(baseKey);
-  delay(8);
-  Keyboard.releaseAll();
+void sendKeyWithMods(uint8_t mods, KeyboardKeycode key) {
+  if (mods) {
+    pressModifiers(mods);
+    delay(4);
+  }
+  Keyboard.press(key);
+  delay(10);
+  Keyboard.release(key);
+  if (mods) {
+    delay(4);
+    Keyboard.releaseAll();
+  }
   delay(6);
 }
 
+void sendDeadKeyChar(KeyboardKeycode deadKey, uint8_t deadMods, KeyboardKeycode baseKey, bool shiftBase) {
+  sendKeyWithMods(deadMods, deadKey);
+  delay(8);
+  sendKeyWithMods(shiftBase ? 0x02 : 0x00, baseKey);
+}
+
+void sendSpanishNWithInputSwitch(bool uppercase) {
+  // Toggle input source (Ctrl + Space), send direct Spanish 'ñ' (KEY_SEMICOLON), toggle back
+  sendKeyWithMods(0x01, KEY_SPACE);
+  delay(55);
+  sendKeyWithMods(uppercase ? 0x02 : 0x00, KEY_SEMICOLON);
+  delay(35);
+  sendKeyWithMods(0x01, KEY_SPACE);
+  delay(45);
+}
+
+bool sendSpanishIsoAsciiSymbol(uint8_t ch) {
+  switch (ch) {
+    case '_': sendKeyWithMods(0x02, KEY_SLASH);       return true; // Shift + '-' (VK 44)
+    case '=': sendKeyWithMods(0x02, KEY_0);           return true; // Shift + 0
+    case '(': sendKeyWithMods(0x02, KEY_8);           return true; // Shift + 8
+    case ')': sendKeyWithMods(0x02, KEY_9);           return true; // Shift + 9
+    case '"': sendKeyWithMods(0x02, KEY_2);           return true; // Shift + 2
+    case '\'': sendKeyWithMods(0x00, KEY_MINUS);      return true; // VK 27
+    case '?': sendKeyWithMods(0x02, KEY_MINUS);       return true; // Shift + VK 27
+    case ';': sendKeyWithMods(0x02, KEY_COMMA);       return true; // Shift + ,
+    case ':': sendKeyWithMods(0x02, KEY_PERIOD);      return true; // Shift + .
+    case '&': sendKeyWithMods(0x02, KEY_6);           return true; // Shift + 6
+    case '@': sendKeyWithMods(0x04, KEY_2);           return true; // Option + 2
+    case '#': sendKeyWithMods(0x04, KEY_3);           return true; // Option + 3
+    case '|': sendKeyWithMods(0x04, KEY_1);           return true; // Option + 1
+    case '\\': sendKeyWithMods(0x04, KEY_TILDE);      return true; // Option + º
+    case '[': sendKeyWithMods(0x04, KEY_LEFT_BRACE);  return true; // Option + `
+    case ']': sendKeyWithMods(0x04, KEY_RIGHT_BRACE); return true; // Option + +
+    case '{': sendKeyWithMods(0x04, KEY_QUOTE);       return true; // Option + ´
+    case '}': sendKeyWithMods(0x04, KEY_BACKSLASH);   return true; // Option + ç
+    default:  return false;
+  }
+}
+
 void typeUtf8TextFromEeprom(uint16_t offset) {
+  uint8_t kbdMode = getKbdMode(); // 0 = Spanish-ISO, 1 = ABC/US, 2 = ABC/US + Switch for ñ
   uint16_t i = offset;
   while (i < EEPROM_TXT_SIZE) {
     uint8_t b1 = EEPROM.read(EEPROM_TXT_ADDR + i);
     if (b1 == 0 || b1 == 0xFF) break;
     i++;
 
-    // Handle 2-byte UTF-8 Latin-1 Supplement (0xC2 / 0xC3) for macOS ABC layout
+    // Handle 2-byte UTF-8 Latin-1 Supplement (0xC2 / 0xC3)
     if ((b1 == 0xC3 || b1 == 0xC2) && i < EEPROM_TXT_SIZE) {
       uint8_t b2 = EEPROM.read(EEPROM_TXT_ADDR + i);
       if (b2 != 0 && b2 != 0xFF) i++;
 
       if (b1 == 0xC3) {
-        switch (b2) {
-          case 0xB1: sendDeadKeyChar(KEY_N, KEY_N, false); break; // ñ
-          case 0x91: sendDeadKeyChar(KEY_N, KEY_N, true);  break; // Ñ
-          case 0xA1: sendDeadKeyChar(KEY_E, KEY_A, false); break; // á
-          case 0x81: sendDeadKeyChar(KEY_E, KEY_A, true);  break; // Á
-          case 0xA9: sendDeadKeyChar(KEY_E, KEY_E, false); break; // é
-          case 0x89: sendDeadKeyChar(KEY_E, KEY_E, true);  break; // É
-          case 0xAD: sendDeadKeyChar(KEY_E, KEY_I, false); break; // í
-          case 0x8D: sendDeadKeyChar(KEY_E, KEY_I, true);  break; // Í
-          case 0xB3: sendDeadKeyChar(KEY_E, KEY_O, false); break; // ó
-          case 0x93: sendDeadKeyChar(KEY_E, KEY_O, true);  break; // Ó
-          case 0xBA: sendDeadKeyChar(KEY_E, KEY_U, false); break; // ú
-          case 0x9A: sendDeadKeyChar(KEY_E, KEY_U, true);  break; // Ú
-          case 0xBC: sendDeadKeyChar(KEY_U, KEY_U, false); break; // ü
-          case 0x9C: sendDeadKeyChar(KEY_U, KEY_U, true);  break; // Ü
+        if (kbdMode == 0) {
+          // Spanish - ISO native keys (ñ/Ñ are direct keys, so they work in macOS password fields!)
+          switch (b2) {
+            case 0xB1: sendKeyWithMods(0x00, KEY_SEMICOLON); break; // ñ direct
+            case 0x91: sendKeyWithMods(0x02, KEY_SEMICOLON); break; // Ñ direct (Shift + ñ)
+            case 0xA1: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_A, false); break; // á
+            case 0x81: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_A, true);  break; // Á
+            case 0xA9: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_E, false); break; // é
+            case 0x89: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_E, true);  break; // É
+            case 0xAD: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_I, false); break; // í
+            case 0x8D: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_I, true);  break; // Í
+            case 0xB3: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_O, false); break; // ó
+            case 0x93: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_O, true);  break; // Ó
+            case 0xBA: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_U, false); break; // ú
+            case 0x9A: sendDeadKeyChar(KEY_QUOTE, 0x00, KEY_U, true);  break; // Ú
+            case 0xBC: sendDeadKeyChar(KEY_QUOTE, 0x02, KEY_U, false); break; // ü
+            case 0x9C: sendDeadKeyChar(KEY_QUOTE, 0x02, KEY_U, true);  break; // Ü
+          }
+        } else {
+          // ABC / US mode (kbdMode 1 or 2)
+          switch (b2) {
+            case 0xB1:
+              if (kbdMode == 2) sendSpanishNWithInputSwitch(false);
+              else sendDeadKeyChar(KEY_N, 0x04, KEY_N, false);
+              break; // ñ
+            case 0x91:
+              if (kbdMode == 2) sendSpanishNWithInputSwitch(true);
+              else sendDeadKeyChar(KEY_N, 0x04, KEY_N, true);
+              break; // Ñ
+            case 0xA1: sendDeadKeyChar(KEY_E, 0x04, KEY_A, false); break; // á
+            case 0x81: sendDeadKeyChar(KEY_E, 0x04, KEY_A, true);  break; // Á
+            case 0xA9: sendDeadKeyChar(KEY_E, 0x04, KEY_E, false); break; // é
+            case 0x89: sendDeadKeyChar(KEY_E, 0x04, KEY_E, true);  break; // É
+            case 0xAD: sendDeadKeyChar(KEY_E, 0x04, KEY_I, false); break; // í
+            case 0x8D: sendDeadKeyChar(KEY_E, 0x04, KEY_I, true);  break; // Í
+            case 0xB3: sendDeadKeyChar(KEY_E, 0x04, KEY_O, false); break; // ó
+            case 0x93: sendDeadKeyChar(KEY_E, 0x04, KEY_O, true);  break; // Ó
+            case 0xBA: sendDeadKeyChar(KEY_E, 0x04, KEY_U, false); break; // ú
+            case 0x9A: sendDeadKeyChar(KEY_E, 0x04, KEY_U, true);  break; // Ú
+            case 0xBC: sendDeadKeyChar(KEY_U, 0x04, KEY_U, false); break; // ü
+            case 0x9C: sendDeadKeyChar(KEY_U, 0x04, KEY_U, true);  break; // Ü
+          }
         }
       } else if (b1 == 0xC2) {
-        if (b2 == 0xA1) { // ¡ (Option + 1)
-          Keyboard.press(KEY_LEFT_ALT);
-          Keyboard.press(KEY_1);
-          delay(8);
-          Keyboard.releaseAll();
-          delay(6);
-        } else if (b2 == 0xBF) { // ¿ (Option + Shift + /)
-          Keyboard.press(KEY_LEFT_ALT);
-          Keyboard.press(KEY_LEFT_SHIFT);
-          Keyboard.press(KEY_SLASH);
-          delay(8);
-          Keyboard.releaseAll();
-          delay(6);
+        if (b2 == 0xA1) { // ¡
+          if (kbdMode == 0) sendKeyWithMods(0x00, KEY_EQUAL);
+          else sendKeyWithMods(0x04, KEY_1);
+        } else if (b2 == 0xBF) { // ¿
+          if (kbdMode == 0) sendKeyWithMods(0x02, KEY_EQUAL);
+          else sendKeyWithMods(0x04 | 0x02, KEY_SLASH);
         }
       }
       continue;
@@ -376,6 +454,10 @@ void typeUtf8TextFromEeprom(uint16_t offset) {
     if (b1 == '/') { Keyboard.write(KEYPAD_DIVIDE);   delay(4); continue; }
     if (b1 == '*') { Keyboard.write(KEYPAD_MULTIPLY); delay(4); continue; }
     if (b1 == '+') { Keyboard.write(KEYPAD_ADD);      delay(4); continue; }
+
+    if (kbdMode == 0 && sendSpanishIsoAsciiSymbol(b1)) {
+      continue;
+    }
 
     Keyboard.write((char)b1);
     delay(4);
@@ -388,6 +470,18 @@ void executeButtonAction(const ButtonAction &act) {
       break;
 
     case ACT_KEY:
+      if (act.arg1 == 250) {
+        bool upper = (act.mods & 0x02) != 0;
+        uint8_t kbdMode = getKbdMode();
+        if (kbdMode == 0) {
+          sendKeyWithMods(act.mods, KEY_SEMICOLON);
+        } else if (kbdMode == 2) {
+          sendSpanishNWithInputSwitch(upper);
+        } else {
+          sendDeadKeyChar(KEY_N, 0x04, KEY_N, upper);
+        }
+        break;
+      }
       pressModifiers(act.mods);
       if (act.arg1 != 0) Keyboard.press((KeyboardKeycode)act.arg1);
       if (act.arg2 != 0) Keyboard.press((KeyboardKeycode)act.arg2);
@@ -470,9 +564,10 @@ void dumpConfigToSerial() {
   Serial.print(cfg.encCcwCode);          Serial.print(' ');
   Serial.print(cfg.encClickCode);        Serial.print(' ');
   Serial.print(cfg.encLongClickCode);    Serial.print(' ');
-  Serial.print(cfg.defaultLayout);       Serial.print(' ');
+  Serial.print(getDefaultLayoutIdx());   Serial.print(' ');
   Serial.print(currentState);            Serial.print(' ');
-  Serial.println(getLedBrightnessPct());
+  Serial.print(getLedBrightnessPct());   Serial.print(' ');
+  Serial.println(getKbdMode());
 
   for (int l = 0; l < NUM_LAYOUTS; l++) {
     for (int b = 0; b < NUM_BUTTONS; b++) {
@@ -539,13 +634,21 @@ void handleSerialCommand(String line) {
   }
   if (line == "RESET_DEFAULTS") {
     resetDefaults();
-    setActiveLayout(cfg.defaultLayout, false);
+    setActiveLayout(getDefaultLayoutIdx(), false);
     Serial.println(F("OK"));
     return;
   }
   if (line.startsWith("SET_LAYOUT ")) {
     int l = line.substring(11).toInt();
     setActiveLayout(l, false);
+    Serial.println(F("OK"));
+    return;
+  }
+  if (line.startsWith("SET_KBD ")) {
+    int m = line.substring(8).toInt();
+    if (m < 0 || m > 2) m = 0;
+    setLayoutAndKbdMode(getDefaultLayoutIdx(), (uint8_t)m);
+    saveGlobalConfig();
     Serial.println(F("OK"));
     return;
   }
@@ -568,6 +671,7 @@ void handleSerialCommand(String line) {
     int s5 = line.indexOf(' ', s4 + 1);
     int s6 = line.indexOf(' ', s5 + 1);
     int s7 = line.indexOf(' ', s6 + 1);
+    int s8 = line.indexOf(' ', s7 + 1);
     if (s1 > 0 && s2 > 0 && s3 > 0 && s4 > 0 && s5 > 0 && s6 > 0) {
       cfg.encStepsPerClick = (uint8_t)line.substring(p1, s1).toInt();
       cfg.encInvert        = (uint8_t)line.substring(s1 + 1, s2).toInt();
@@ -575,15 +679,21 @@ void handleSerialCommand(String line) {
       cfg.encCcwCode       = (uint16_t)line.substring(s3 + 1, s4).toInt();
       cfg.encClickCode     = (uint16_t)line.substring(s4 + 1, s5).toInt();
       cfg.encLongClickCode = (uint16_t)line.substring(s5 + 1, s6).toInt();
+      uint8_t defLay = getDefaultLayoutIdx();
+      uint8_t kbdMode = getKbdMode();
       if (s7 > 0) {
-        cfg.defaultLayout = (uint8_t)line.substring(s6 + 1, s7).toInt();
-        int b = line.substring(s7 + 1).toInt();
+        defLay = (uint8_t)line.substring(s6 + 1, s7).toInt();
+        int b = (s8 > 0) ? line.substring(s7 + 1, s8).toInt() : line.substring(s7 + 1).toInt();
         if (b < 0) b = 0;
         if (b > 100) b = 100;
         setLedBrightnessPct((uint8_t)b);
+        if (s8 > 0) {
+          kbdMode = (uint8_t)line.substring(s8 + 1).toInt();
+        }
       } else {
-        cfg.defaultLayout = (uint8_t)line.substring(s6 + 1).toInt();
+        defLay = (uint8_t)line.substring(s6 + 1).toInt();
       }
+      setLayoutAndKbdMode(defLay, kbdMode);
       if (cfg.encStepsPerClick == 0) cfg.encStepsPerClick = 4;
       saveGlobalConfig();
       applyLedPwmConfig();
@@ -660,7 +770,7 @@ void setup() {
   encoderButton.interval(10);
 
   ensureEepromInitialized();
-  currentState = cfg.defaultLayout;
+  currentState = getDefaultLayoutIdx();
 
   Keyboard.begin();
   Consumer.begin();
