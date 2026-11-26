@@ -640,6 +640,10 @@ void loop() {
     if (key == '*') {
       setActiveLayout((currentState + 1) % NUM_LAYOUTS, true);
       delay(80);
+    } else if (key == 'X') {
+      Serial.println(F("EVT ENC CLICK"));
+      executeConsumerCode(cfg.encClickCode);
+      Keyboard.releaseAll();
     } else {
       int btnIdx = buttonIndexFromChar(key);
       if (btnIdx >= 0) {
