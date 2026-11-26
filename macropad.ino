@@ -635,6 +635,8 @@ void loop() {
   // 2. Scan key matrix
   char key = kpd.getKey();
   if (key) {
+    // Discard any partial sub-detent encoder jitter while typing on keys
+    oldPosition = volumeKnob.read();
     if (key == '*') {
       setActiveLayout((currentState + 1) % NUM_LAYOUTS, true);
       delay(80);
@@ -651,6 +653,7 @@ void loop() {
         executeButtonAction(act);
       }
     }
+    oldPosition = volumeKnob.read();
   }
 
   // 3. Check encoder button
@@ -678,12 +681,14 @@ void loop() {
     }
   }
 
-  // 4. Check encoder rotation
-  long newPosition = volumeKnob.read() / (long)cfg.encStepsPerClick;
-  if (newPosition != oldPosition) {
-    long diff = newPosition - oldPosition;
-    oldPosition = newPosition;
-    bool clockwise = cfg.encInvert ? (diff > 0) : (diff < 0);
+  // 4. Check encoder rotation (with full-step hysteresis against mechanical vibration)
+  long rawPosition = volumeKnob.read();
+  long step = (long)cfg.encStepsPerClick;
+  long rawDiff = rawPosition - oldPosition;
+  if (rawDiff >= step || rawDiff <= -step) {
+    long clicks = rawDiff / step;
+    oldPosition += clicks * step;
+    bool clockwise = cfg.encInvert ? (clicks > 0) : (clicks < 0);
     if (clockwise) {
       Serial.println(F("EVT ENC CW"));
       executeConsumerCode(cfg.encCwCode);
