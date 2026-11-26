@@ -20,6 +20,11 @@ Keypad kpd = Keypad(makeKeymap(keys), colPins, rowPins, COLS, ROWS);
 
 const int numStates = 4;
 const int States[numStates] = {10, 16, 14, 15};
+// PORTB bit masks for pins {10 (PB6), 16 (PB2), 14 (PB3), 15 (PB1)}
+const uint8_t LedPortBMasks[numStates] = {_BV(6), _BV(2), _BV(3), _BV(1)};
+const uint8_t LED_ALL_PORTB_MASK = _BV(6) | _BV(2) | _BV(3) | _BV(1);
+volatile uint8_t ledActiveMask = 0;
+volatile uint8_t ledPwmDuty = 12;
 int currentState = 0;
 
 const int PIN_SW  = 19;
@@ -68,7 +73,7 @@ struct GlobalConfig {
   uint16_t encClickCode;
   uint16_t encLongClickCode;
   uint8_t  defaultLayout;
-  uint8_t  reserved;
+  uint8_t  ledBrightnessRaw; // 0x80 | (0..100%), or 0 if legacy uninitialized
 };
 
 struct ButtonAction {
@@ -107,6 +112,21 @@ void writeButtonAction(int layout, int btnIdx, const ButtonAction &act) {
   EEPROM.update(addr + 3, act.arg2);
 }
 
+const uint8_t DEFAULT_LED_BRIGHTNESS_PCT = 20; // 20% perceived brightness default
+
+uint8_t getLedBrightnessPct() {
+  if ((cfg.ledBrightnessRaw & 0x80) == 0) {
+    return DEFAULT_LED_BRIGHTNESS_PCT;
+  }
+  uint8_t pct = cfg.ledBrightnessRaw & 0x7F;
+  return (pct > 100) ? 100 : pct;
+}
+
+void setLedBrightnessPct(uint8_t pct) {
+  if (pct > 100) pct = 100;
+  cfg.ledBrightnessRaw = 0x80 | pct;
+}
+
 void loadGlobalConfig() {
   EEPROM.get(EEPROM_CFG_ADDR, cfg);
   if (cfg.encStepsPerClick == 0 || cfg.encStepsPerClick > 16) {
@@ -114,6 +134,9 @@ void loadGlobalConfig() {
   }
   if (cfg.defaultLayout >= NUM_LAYOUTS) {
     cfg.defaultLayout = 0;
+  }
+  if ((cfg.ledBrightnessRaw & 0x80) == 0 || (cfg.ledBrightnessRaw & 0x7F) > 100) {
+    setLedBrightnessPct(DEFAULT_LED_BRIGHTNESS_PCT);
   }
 }
 
@@ -129,7 +152,7 @@ void resetDefaults() {
   cfg.encClickCode     = MEDIA_VOLUME_MUTE;
   cfg.encLongClickCode = 0; // Immediate click action without waiting for long press
   cfg.defaultLayout    = 0;
-  cfg.reserved         = 0;
+  setLedBrightnessPct(DEFAULT_LED_BRIGHTNESS_PCT);
   saveGlobalConfig();
 
   ButtonAction emptyAct = {ACT_NONE, 0, 0, 0};
@@ -180,16 +203,69 @@ void ensureEepromInitialized() {
 }
 
 // ============================================================================
-// LED & Layout State Management
+// LED & Layout State Management (Hardware Timer3 PWM on PORTB for all 4 LEDs)
 // ============================================================================
+uint8_t pctToPwmDuty(uint8_t pct) {
+  if (pct == 0) return 0;
+  if (pct >= 100) return 255;
+  // Gamma ~2.0 curve so low percentages dim smoothly to the human eye
+  uint16_t d = ((uint32_t)pct * (uint32_t)pct * 255UL) / 10000UL;
+  return (d == 0) ? 1 : (uint8_t)d;
+}
+
+void applyLedPwmConfig() {
+  uint8_t duty = pctToPwmDuty(getLedBrightnessPct());
+  uint8_t oldSREG = SREG;
+  cli();
+  ledPwmDuty = duty;
+  if (duty == 0 || ledActiveMask == 0) {
+    TIMSK3 = 0;
+    PORTB &= ~LED_ALL_PORTB_MASK;
+  } else if (duty == 255) {
+    TIMSK3 = 0;
+    PORTB = (PORTB & ~LED_ALL_PORTB_MASK) | ledActiveMask;
+  } else {
+    OCR3A = duty;
+    // Fast PWM 8-bit (WGM3 = 0101), prescaler 256 (CS32 = 1) -> ~244 Hz flicker-free
+    TCCR3A = _BV(WGM30);
+    TCCR3B = _BV(WGM32) | _BV(CS32);
+    TIMSK3 = _BV(TOIE3) | _BV(OCIE3A);
+  }
+  SREG = oldSREG;
+}
+
+void setLedMask(uint8_t mask) {
+  uint8_t oldSREG = SREG;
+  cli();
+  ledActiveMask = mask & LED_ALL_PORTB_MASK;
+  SREG = oldSREG;
+  applyLedPwmConfig();
+}
+
+ISR(TIMER3_OVF_vect) {
+  uint8_t m = ledActiveMask;
+  if (m && ledPwmDuty > 0) {
+    PORTB = (PORTB & ~LED_ALL_PORTB_MASK) | m;
+  }
+}
+
+ISR(TIMER3_COMPA_vect) {
+  if (ledPwmDuty < 255) {
+    PORTB &= ~LED_ALL_PORTB_MASK;
+  }
+}
+
 void StartAnimation() {
   int waitTime = 120;
+  uint8_t mask = 0;
   for (int i = 0; i < numStates; i++) {
-    digitalWrite(States[i], HIGH);
+    mask |= LedPortBMasks[i];
+    setLedMask(mask);
     delay(waitTime);
   }
   for (int i = 0; i < numStates; i++) {
-    digitalWrite(States[i], LOW);
+    mask &= ~LedPortBMasks[i];
+    setLedMask(mask);
     delay(waitTime);
   }
 }
@@ -197,9 +273,8 @@ void StartAnimation() {
 void setActiveLayout(int newLayout, bool notifySerial) {
   if (newLayout < 0) newLayout = NUM_LAYOUTS - 1;
   if (newLayout >= NUM_LAYOUTS) newLayout = 0;
-  digitalWrite(States[currentState], LOW);
   currentState = newLayout;
-  digitalWrite(States[currentState], HIGH);
+  setLedMask(LedPortBMasks[currentState]);
   if (notifySerial) {
     Serial.print(F("EVT LAYOUT "));
     Serial.println(currentState);
@@ -389,14 +464,15 @@ void printHexByte(uint8_t b) {
 
 void dumpConfigToSerial() {
   Serial.print(F("CFG "));
-  Serial.print(cfg.encStepsPerClick); Serial.print(' ');
-  Serial.print(cfg.encInvert);        Serial.print(' ');
-  Serial.print(cfg.encCwCode);        Serial.print(' ');
-  Serial.print(cfg.encCcwCode);       Serial.print(' ');
-  Serial.print(cfg.encClickCode);     Serial.print(' ');
-  Serial.print(cfg.encLongClickCode); Serial.print(' ');
-  Serial.print(cfg.defaultLayout);    Serial.print(' ');
-  Serial.println(currentState);
+  Serial.print(cfg.encStepsPerClick);    Serial.print(' ');
+  Serial.print(cfg.encInvert);           Serial.print(' ');
+  Serial.print(cfg.encCwCode);           Serial.print(' ');
+  Serial.print(cfg.encCcwCode);          Serial.print(' ');
+  Serial.print(cfg.encClickCode);        Serial.print(' ');
+  Serial.print(cfg.encLongClickCode);    Serial.print(' ');
+  Serial.print(cfg.defaultLayout);       Serial.print(' ');
+  Serial.print(currentState);            Serial.print(' ');
+  Serial.println(getLedBrightnessPct());
 
   for (int l = 0; l < NUM_LAYOUTS; l++) {
     for (int b = 0; b < NUM_BUTTONS; b++) {
@@ -473,6 +549,16 @@ void handleSerialCommand(String line) {
     Serial.println(F("OK"));
     return;
   }
+  if (line.startsWith("SET_BRIGHTNESS ")) {
+    int b = line.substring(15).toInt();
+    if (b < 0) b = 0;
+    if (b > 100) b = 100;
+    setLedBrightnessPct((uint8_t)b);
+    saveGlobalConfig();
+    applyLedPwmConfig();
+    Serial.println(F("OK"));
+    return;
+  }
   if (line.startsWith("SET_ENC ")) {
     int p1 = 8;
     int s1 = line.indexOf(' ', p1);
@@ -481,6 +567,7 @@ void handleSerialCommand(String line) {
     int s4 = line.indexOf(' ', s3 + 1);
     int s5 = line.indexOf(' ', s4 + 1);
     int s6 = line.indexOf(' ', s5 + 1);
+    int s7 = line.indexOf(' ', s6 + 1);
     if (s1 > 0 && s2 > 0 && s3 > 0 && s4 > 0 && s5 > 0 && s6 > 0) {
       cfg.encStepsPerClick = (uint8_t)line.substring(p1, s1).toInt();
       cfg.encInvert        = (uint8_t)line.substring(s1 + 1, s2).toInt();
@@ -488,9 +575,18 @@ void handleSerialCommand(String line) {
       cfg.encCcwCode       = (uint16_t)line.substring(s3 + 1, s4).toInt();
       cfg.encClickCode     = (uint16_t)line.substring(s4 + 1, s5).toInt();
       cfg.encLongClickCode = (uint16_t)line.substring(s5 + 1, s6).toInt();
-      cfg.defaultLayout    = (uint8_t)line.substring(s6 + 1).toInt();
+      if (s7 > 0) {
+        cfg.defaultLayout = (uint8_t)line.substring(s6 + 1, s7).toInt();
+        int b = line.substring(s7 + 1).toInt();
+        if (b < 0) b = 0;
+        if (b > 100) b = 100;
+        setLedBrightnessPct((uint8_t)b);
+      } else {
+        cfg.defaultLayout = (uint8_t)line.substring(s6 + 1).toInt();
+      }
       if (cfg.encStepsPerClick == 0) cfg.encStepsPerClick = 4;
       saveGlobalConfig();
+      applyLedPwmConfig();
       volumeKnob.write(0);
       oldPosition = 0;
       Serial.println(F("OK"));
@@ -570,7 +666,7 @@ void setup() {
   Consumer.begin();
 
   StartAnimation();
-  digitalWrite(States[currentState], HIGH);
+  setActiveLayout(currentState, false);
   volumeKnob.write(0);
   oldPosition = 0;
 }

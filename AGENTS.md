@@ -20,3 +20,5 @@ Repositorio del firmware y configurador web del **Programmable Macropad V2** (ba
    - Si solo se agregan **presets** o mejoras visuales en `index.html` usando los `ActionType` existentes (`0..5`), **no hace falta reflashear el Arduino**.
    - Si se modifica `macropad.ino`, siempre verificar compilación con `arduino-cli compile --fqbn arduino:avr:leonardo .` y recordar que para flashear (`./flash.sh`), la pestaña del navegador debe estar desconectada del puerto serie (`lsof /dev/cu.usbmodem*` vacío).
    - Nunca usar `1200` baud en conexiones Web Serial normales (en `ATmega32U4`, abrir y cerrar a `1200` baud dispara el reset al bootloader Caterina).
+4. **Despliegue automático en GitHub Pages (`git commit` + `git push`):**
+   - Siempre que se realicen cambios en este repositorio (`index.html`, `macropad.ino`, etc.), hacer `git commit` y `git push origin main` automáticamente al finalizar para mantener actualizada la web desplegada en GitHub Pages.
